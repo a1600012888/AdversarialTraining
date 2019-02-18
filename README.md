@@ -1,4 +1,4 @@
-# AdversarilTraining
+# AdversarialTraining
 
 This is an inplementaion of Adversarial Training on Python3, Pytorch. The code is designed to be easy to be extended.
 
