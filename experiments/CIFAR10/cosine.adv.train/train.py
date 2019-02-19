@@ -15,10 +15,12 @@ import os
 from collections import OrderedDict
 
 DEVICE = torch.device('cuda:{}'.format(args.d))
+print(DEVICE)
 torch.backends.cudnn.benchmark = True
 
 net = create_network()
 net.to(DEVICE)
+#criterion = config.create_loss_function()
 criterion = config.create_loss_function().to(DEVICE)
 
 optimizer = config.create_optimizer(net.parameters())
@@ -31,7 +33,6 @@ TrainAttack = config.create_attack_method(DEVICE)
 EvalAttack = config.create_evaluation_attack_method(DEVICE)
 
 now_epoch = 0
-
 if args.auto_continue:
     args.resume = os.path.join(config.model_dir, 'last.checkpoint')
 if args.resume is not None and os.path.isfile(args.resume):

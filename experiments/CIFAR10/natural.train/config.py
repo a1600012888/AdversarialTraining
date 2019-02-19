@@ -33,7 +33,7 @@ class TrainingConfing(TrainingConfigBase):
     #create_attack_method = None
 
     create_evaluation_attack_method = \
-        IPGDAttackMethodMaker(eps = 8/255.0, sigma = 4/255.0, nb_iters = 20, norm = np.inf,
+        IPGDAttackMethodMaker(eps = 8/255.0, sigma = 2/255.0, nb_iters = 20, norm = np.inf,
                               mean=torch.tensor(
                                   np.array([0.4914, 0.4822, 0.4465]).astype(np.float32)[np.newaxis, :, np.newaxis,
                                   np.newaxis]),
@@ -57,7 +57,8 @@ parser.add_argument('-b', '--batch_size', default=128, type=int,
 parser.add_argument('-d', type=int, default=0, help='Which gpu to use')
 parser.add_argument('-freq', '--attack-interval', default=-1, type = int,
                     help = 'Specify how many iterations between two batch of adv images')
-
+parser.add_argument('--auto-continue', default=False, action = 'store_true',
+                    help = 'Continue from the latest checkpoint')
 args = parser.parse_args()
 
 

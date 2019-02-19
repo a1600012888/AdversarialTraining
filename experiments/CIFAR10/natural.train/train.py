@@ -31,7 +31,8 @@ TrainAttack = config.create_attack_method(DEVICE)
 EvalAttack = config.create_evaluation_attack_method(DEVICE)
 
 now_epoch = 0
-
+if args.auto_continue:
+    args.resume = os.path.join(config.model_dir, 'last.checkpoint')
 if args.resume is not None and os.path.isfile(args.resume):
     now_epoch = load_checkpoint(args.resume, net, optimizer,lr_scheduler)
 

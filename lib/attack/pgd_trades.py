@@ -5,6 +5,7 @@ Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, Adrian V
 arXiv:1706.06083v3
 '''
 import torch
+import torch.nn.functional as F
 import numpy as np
 import os
 import sys
@@ -13,14 +14,14 @@ if not father_dir in sys.path:
     sys.path.append(father_dir)
 from attack.attack_base import AttackBase, clip_eta
 
-class IPGD(AttackBase):
+class IPGDTrades(AttackBase):
     # ImageNet pre-trained mean and std
     # _mean = torch.tensor(np.array([0.485, 0.456, 0.406]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis])
     # _std = torch.tensor(np.array([0.229, 0.224, 0.225]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis])
 
     # _mean = torch.tensor(np.array([0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis])
     # _std = torch.tensor(np.array([1.0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis])
-    def __init__(self, eps = 6 / 255.0, sigma = 3 / 255.0, nb_iter = 20,
+    def __init__(self, eps = 8 / 255.0, sigma = 2 / 255.0, nb_iter = 20,
                  norm = np.inf, DEVICE = torch.device('cpu'),
                  mean = torch.tensor(np.array([0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]),
                  std = torch.tensor(np.array([1.0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis])):
@@ -34,18 +35,18 @@ class IPGD(AttackBase):
         self.sigma = sigma
         self.nb_iter = nb_iter
         self.norm = norm
-        self.criterion = torch.nn.CrossEntropyLoss().to(DEVICE)
+        self.criterion = torch.nn.KLDivLoss(size_average=False).to(DEVICE)
         self.DEVICE = DEVICE
         self._mean = mean.to(DEVICE)
         self._std = std.to(DEVICE)
 
-    def single_attack(self, net, inp, label, eta, target = None):
+    def single_attack(self, net, inp, pred_natural, eta):
         '''
         Given the original image and the perturbation computed so far, computes
         a new perturbation.
         :param net:
         :param inp: original image
-        :param label:
+        :param pred_natural:  predictions on
         :param eta: perturbation computed so far
         :return: a new perturbation
         '''
@@ -55,14 +56,10 @@ class IPGD(AttackBase):
         net.zero_grad()
 
         pred = net(adv_inp)
-        if target is not None:
-            targets = torch.sum(pred[:, target])
-            grad_sign = torch.autograd.grad(targets, adv_in, only_inputs=True, retain_graph = False)[0].sign()
 
-        else:
-            loss = self.criterion(pred, label)
-            grad_sign = torch.autograd.grad(loss, adv_inp,
-                                            only_inputs=True, retain_graph = False)[0].sign()
+        loss = self.criterion(F.log_softmax(pred, dim = 1),F.softmax(pred_natural, dim=1))
+        grad_sign = torch.autograd.grad(loss, adv_inp,
+                                        only_inputs=True, retain_graph = False)[0].sign()
 
         adv_inp = adv_inp + grad_sign * (self.sigma / self._std)
         tmp_adv_inp = adv_inp * self._std +  self._mean
@@ -77,8 +74,7 @@ class IPGD(AttackBase):
 
         return eta
 
-    def attack(self, net, inp, label, target = None):
-
+    def attack(self, net, inp, *inputs):
 
         eta = torch.zeros_like(inp)
         eta = eta.to(self.DEVICE)
@@ -86,8 +82,10 @@ class IPGD(AttackBase):
 
         inp.requires_grad = True
         eta.requires_grad = True
+        with torch.no_grad():
+            pred_natural = net(inp)
         for i in range(self.nb_iter):
-            eta = self.single_attack(net, inp, label, eta, target)
+            eta = self.single_attck(net, inp, pred_natural, eta)
             #print(i)
 
         #print(eta.max())
@@ -104,7 +102,7 @@ class IPGD(AttackBase):
         self._std = self._std.to(device)
         self.criterion = self.criterion.to(device)
 
-def test_IPGD():
+def test_IPGDTrades():
     pass
 if __name__ == '__main__':
-    test_IPGD()
+    test_IPGDTrades()

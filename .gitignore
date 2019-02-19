@@ -1,3 +1,5 @@
 *.checkpoint*
 **data/
 *__pycache__*
+*mig*
+**ttt*/

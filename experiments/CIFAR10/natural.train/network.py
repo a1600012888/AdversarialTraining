@@ -2,7 +2,7 @@ import config
 from base_model.cifar_resnet18 import cifar_resnet18
 
 def create_network():
-    net = cifar_resnet18(num_class = 10, expansion = 2)
+    net = cifar_resnet18(num_class = 10, expansion = 1)
 
     return net
 
