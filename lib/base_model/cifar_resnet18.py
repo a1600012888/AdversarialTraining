@@ -9,119 +9,116 @@ https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
 '''
 
 import torch
-import numpy as np
-import torch.nn  as nn
+import torch.nn as nn
 import torch.nn.functional as F
-class resnet18_3x3_3x3(nn.Module):
 
 
-    def __init__(self, inp_chn, out_chn, stride = 1, has_proj = False):
+class BasicBlock(nn.Module):
+    expansion = 1
 
-        super(resnet18_3x3_3x3, self).__init__()
-        self.conv1 = nn.Conv2d(inp_chn, out_chn, kernel_size = 3, stride = stride, padding = 1)
-        self.bn1 = nn.BatchNorm2d(out_chn)
-        self.conv2 = nn.Conv2d(out_chn, out_chn, kernel_size = 3, stride = 1, padding = 1)
-        self.bn2 = nn.BatchNorm2d(out_chn)
-        self.proj = None
-        if has_proj:
-            self.proj = nn.Conv2d(inp_chn, out_chn, kernel_size = 1, stride = stride, padding = 0)
+    def __init__(self, in_planes, planes, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
 
-    def forward(self, inp):
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
 
-        x = inp
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = F.relu(x)
 
-        x = self.conv2(x)
-        x = self.bn2(x)
+class Bottleneck(nn.Module):
+    expansion = 4
 
-        proj = inp
-        if self.proj != None:
-            proj = self.proj(proj)
+    def __init__(self, in_planes, planes, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv3 = nn.Conv2d(planes, self.expansion*planes, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
 
-        x = x + proj
-        x = F.relu(x)
-        return x
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
 
-def make_resnet18_block(depth, inp_chn, out_chn, stride = 2):
-    blocks = []
-    blocks.append(resnet18_3x3_3x3(inp_chn, out_chn, stride, True))
-    for i in range(depth - 1):
-        blocks.append(resnet18_3x3_3x3(out_chn, out_chn, 1, False))
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
 
-    return nn.Sequential(*blocks)
 
-class cifar_resnet18(nn.Module):
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet, self).__init__()
+        self.in_planes = 64
 
-    def __init__(self, num_class = 10, expansion:int = 1):
-        '''
-        expansion: standard resnet-18 has channels as [64, 64, 128, 256, 512] which corresponds expansion as 1
-        increase expansion can lead to wider resnet-18
-        '''
-
-        super(cifar_resnet18, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size = 3, stride = 1, padding = 1)
-
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        self.linear = nn.Linear(512*block.expansion, num_classes)
 
-        self.block1 = make_resnet18_block(2, 64, 64 * expansion, stride = 1)
-        self.block2 = make_resnet18_block(2, 64 * expansion, 128 * expansion, stride = 2)
-        self.block3 = make_resnet18_block(2, 128 * expansion, 256 * expansion, stride = 2)
-        self.block4 = make_resnet18_block(2, 256 * expansion, 512 * expansion, stride = 2)
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
 
-        self.global_avg_pool = nn.AdaptiveAvgPool2d(output_size = 1)
-        self.fc = nn.Linear(512 * expansion, num_class)
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = F.avg_pool2d(out, 4)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+        return out
 
-        #self.kaiming_init()
-    def forward(self, inp):
 
-        x = self.conv1(inp)
-        x = self.bn1(x)
-        x = F.relu(x)
+def cifar_resnet18(*args, **kargs):
+    return ResNet(BasicBlock, [2,2,2,2])
 
-        x = self.block1(x)
-        x = self.block2(x)
-        x = self.block3(x)
-        x = self.block4(x)
+def ResNet34():
+    return ResNet(BasicBlock, [3,4,6,3])
 
-        x = self.global_avg_pool(x)
+def ResNet50():
+    return ResNet(Bottleneck, [3,4,6,3])
 
-        x = x.view(x.size(0), -1)
+def ResNet101():
+    return ResNet(Bottleneck, [3,4,23,3])
 
-        x = self.fc(x)
-
-        return x
-
-    def kaiming_init(self):
-        '''
-        This is not used
-        '''
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight)
-                nn.init.constant_(m.bias, 0)
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight)
-                nn.init.constant_(m.bias, 0)
-
-            if isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.bias, 0)
-                nn.init.constant_(m.weight, 1)
+def ResNet152():
+    return ResNet(Bottleneck, [3,8,36,3])
 
 
 def test():
-
-    inp = np.random.randn(1, 3, 32, 32)
-    inp = torch.tensor(inp, dtype = torch.float32).cuda()
-
-    net = cifar_resnet18().cuda()
-    print(net)
-    pred = net(inp)
-    print(net.conv1.data)
-    print(pred)
-
+    net = ResNet18()
+    y = net(torch.randn(1,3,32,32))
+    print(y.size())
 
 if __name__ == '__main__':
 

@@ -1,0 +1,3 @@
+clean acc -- 41.59     adv acc -- 29.47
+clean acc -- 42.33     adv acc -- 28.89
+cleanAcc=42.50, cleanloss=2.01, AdvAcc=43.75, Robloss=0.07

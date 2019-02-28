@@ -1,30 +1,33 @@
 import os
 import sys
-father_dir = os.path.join('/',  *os.path.realpath(__file__).split(os.path.sep)[:-2])
-#print(father_dir)
-if not father_dir in sys.path:
-    sys.path.append(father_dir)
+import config
 from utils.misc import torch_accuracy, AvgMeter
 from collections import OrderedDict
 import torch
 from tqdm import tqdm
+import torch.nn.functional as F
+
 
 def train_one_epoch(net, batch_generator, optimizer,
                     criterion, DEVICE=torch.device('cuda:0'),
-                    descrip_str='Training', AttackMethod = None, adv_coef = 1.0):
+                    descrip_str='Training', AttackMethod = None, alpha = 1):
     '''
 
-    :param attack_freq:  Frequencies of training with adversarial examples. -1 indicates natural training
     :param AttackMethod: the attack method, None represents natural training
+    :param alpha: weight coeffcient for mig loss
     :return:  None    #(clean_acc, adv_acc)
     '''
+
+    #assert callable(AttackMethod)
     net.train()
     pbar = tqdm(batch_generator)
     advacc = -1
     advloss = -1
     cleanacc = -1
     cleanloss = -1
+    criterion_kl = torch.nn.KLDivLoss(size_average=False).to(DEVICE)
     pbar.set_description(descrip_str)
+
     for i, (data, label) in enumerate(pbar):
         data = data.to(DEVICE)
         label = label.to(DEVICE)
@@ -32,37 +35,35 @@ def train_one_epoch(net, batch_generator, optimizer,
         optimizer.zero_grad()
 
         pbar_dic = OrderedDict()
-        TotalLoss = 0
 
-        if AttackMethod is not None:
-            adv_inp = AttackMethod.attack(net, data, label)
-            optimizer.zero_grad()
-            pred = net(adv_inp)
-            loss = criterion(pred, label)
+        adv_inp = AttackMethod.attack(net, data, label)
 
-            acc = torch_accuracy(pred, label, (1,))
-            advacc = acc[0].item()
-            advloss = loss.item()
-            TotalLoss = TotalLoss + loss * adv_coef
+        optimizer.zero_grad()
+        pred1 = net(adv_inp)
+        pred2 = net(data)
+        loss_robust = criterion_kl(F.log_softmax(pred1, dim=1), F.softmax(pred2, dim = 1))
+        loss_natural = criterion(pred2, label)
+        TotalLoss = loss_natural + alpha * loss_robust
 
-
-        pred = net(data)
-
-        loss = criterion(pred, label)
-        TotalLoss = TotalLoss + loss
         TotalLoss.backward()
-        #param = next(net.parameters())
-        #grad_mean = torch.mean(param.grad)
 
-        optimizer.step()
-        acc = torch_accuracy(pred, label, (1,))
+        acc = torch_accuracy(pred1, label, (1,))
+        advacc = acc[0].item()
+        advloss = loss_robust.item()
+
+        acc = torch_accuracy(pred2, label, (1,))
         cleanacc = acc[0].item()
-        cleanloss = loss.item()
-        #pbar_dic['grad'] = '{}'.format(grad_mean)
-        pbar_dic['Acc'] = '{:.2f}'.format(cleanacc)
-        pbar_dic['loss'] = '{:.2f}'.format(cleanloss)
+        cleanloss = loss_natural.item()
+
+        param = next(net.parameters())
+        grad_mean = torch.mean(param.grad)
+        optimizer.step()
+
+        pbar_dic['grad'] = '{}'.format(grad_mean)
+        pbar_dic['cleanAcc'] = '{:.2f}'.format(cleanacc)
+        pbar_dic['cleanloss'] = '{:.2f}'.format(cleanloss)
         pbar_dic['AdvAcc'] = '{:.2f}'.format(advacc)
-        pbar_dic['Advloss'] = '{:.2f}'.format(advloss)
+        pbar_dic['Robloss'] = '{:.2f}'.format(advloss)
         pbar.set_postfix(pbar_dic)
 
 

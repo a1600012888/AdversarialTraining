@@ -1,8 +1,8 @@
 '''
 Reference:
-[1] Towards Deep Learning Models Resistant to Adversarial Attacks
-Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, Adrian Vladu
-arXiv:1706.06083v3
+[1] Theoretically Principled Trade-off between Robustness and Accuracy
+Hongyang Zhang, Yaodong Yu, Jiantao Jiao, Eric P. Xing, Laurent El Ghaoui, Michael I. Jordan
+arXiv:1901.08573
 '''
 import torch
 import torch.nn.functional as F
@@ -85,7 +85,7 @@ class IPGDTrades(AttackBase):
         with torch.no_grad():
             pred_natural = net(inp)
         for i in range(self.nb_iter):
-            eta = self.single_attck(net, inp, pred_natural, eta)
+            eta = self.single_attack(net, inp, pred_natural, eta)
             #print(i)
 
         #print(eta.max())
