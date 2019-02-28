@@ -45,7 +45,7 @@ while True:
     descrip_str = 'Training epoch:{}/{} -- lr:{}'.format(now_epoch, config.num_epochs,
                                                                        lr_scheduler.get_lr()[0])
     train_one_epoch(net, ds_train, optimizer, criterion, DEVICE,
-                    descrip_str, TrainAttack, attack_freq = args.attack_interval)
+                    descrip_str, TrainAttack, adv_coef = args.adv_coef)
     if config.val_interval > 0 and now_epoch % config.val_interval == 0:
         eval_one_epoch(net, ds_val, DEVICE, EvalAttack)
 

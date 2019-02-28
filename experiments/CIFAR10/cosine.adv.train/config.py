@@ -51,17 +51,14 @@ class TrainingConfing(TrainingConfigBase):
     create_loss_function = CosineClassificationLoss
 
     create_attack_method = \
-        IPGDAttackMethodMaker(eps = 8/255.0, sigma = 2/255.0, nb_iters = 20, norm = np.inf,
-                              mean = torch.tensor(np.array([0.4914, 0.4822, 0.4465]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]),
-                              std = torch.tensor(np.array([0.2023, 0.1994, 0.2010]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]))
+        IPGDAttackMethodMaker(eps = 8/255.0, sigma = 2/255.0, nb_iters = 10, norm = np.inf,
+                              mean = torch.tensor(np.array([0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]),
+                              std = torch.tensor(np.array([1]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]))
 
     create_evaluation_attack_method = \
         IPGDAttackMethodMaker(eps = 8/255.0, sigma = 2/255.0, nb_iters = 20, norm = np.inf,
-                              mean=torch.tensor(
-                                  np.array([0.4914, 0.4822, 0.4465]).astype(np.float32)[np.newaxis, :, np.newaxis,
-                                  np.newaxis]),
-                              std=torch.tensor(np.array(
-                                  [0.2023, 0.1994, 0.2010]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]))
+                              mean = torch.tensor(np.array([0]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]),
+                              std = torch.tensor(np.array([1]).astype(np.float32)[np.newaxis, :, np.newaxis, np.newaxis]))
 
 
 config = TrainingConfing()
